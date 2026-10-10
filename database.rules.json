@@ -1,0 +1,60 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12')",
+        ".write": "auth != null && (auth.uid == $uid || auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12')"
+      }
+    },
+    "devices": {
+      "$deviceId": {
+        ".read": "auth != null && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+        ".write": "auth != null && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || (!data.exists() && newData.child('ownerUid').val() == auth.uid))",
+        "ownerUid": {
+          ".validate": "newData.isString() && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || newData.val() == auth.uid)"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "status": {
+          ".write": "auth != null && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          ".validate": "newData.hasChildren(['online'])",
+          "online": {
+            ".validate": "newData.isBoolean()"
+          },
+          "lastSeen": {
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "commands": {
+          ".read": "auth != null && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || root.child('devices').child($deviceId).child('ownerUid').val() == auth.uid)",
+          ".write": "auth != null && auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12'",
+          "$commandId": {
+            ".validate": "newData.hasChildren(['type','createdAt','status'])",
+            "type": {
+              ".validate": "newData.val() == 'PING' || newData.val() == 'SHOW_MESSAGE'"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "status": {
+              ".validate": "newData.val() == 'pending' || newData.val() == 'received' || newData.val() == 'done'"
+            }
+          }
+        }
+      }
+    },
+    "notifications": {
+      "$notificationId": {
+        ".read": "auth != null && (auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12' || data.child('recipientUid').val() == auth.uid)",
+        ".write": "auth != null && auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12'"
+      }
+    },
+    "activityLogs": {
+      ".read": "auth != null && auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12'",
+      ".write": "auth != null && auth.uid == 'B7RH4NNrrgdZpx6kRf6NvIlE8j12'"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101214"><title>LM26 Admin Dashboard</title>
+<link rel="icon" href="https://i.ibb.co/jZV93XTW/eed188294f3a.jpg">
+<style>
+:root{color-scheme:dark;--bg:#0d1012;--panel:#151a1d;--line:#2b3337;--muted:#9aa6ab;--red:#d62f3c;--green:#26c281}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#202124 0,#0d1012 55%);font:15px/1.45 system-ui,Segoe UI,Arial;color:#f5f7f8;min-height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:18px max(18px,calc((100vw - 1180px)/2));border-bottom:1px solid var(--line);background:#101214eF;position:sticky;top:0;z-index:2}
+.logo{width:48px;height:48px;border-radius:12px;object-fit:cover;border:1px solid #394145}h1{font-size:19px;margin:0}header p{margin:2px 0 0;color:var(--muted);font-size:12px}.spacer{flex:1}.wrap{max-width:1180px;margin:28px auto;padding:0 18px}
+.panel{background:linear-gradient(145deg,#191e21,#121618);border:1px solid var(--line);border-radius:17px;padding:20px;box-shadow:0 12px 35px #0003}
+.login{max-width:430px;margin:55px auto}.hidden{display:none!important}.muted{color:var(--muted)}label{display:block;margin:12px 0 6px;color:#cbd2d5;font-size:13px}
+input,select{width:100%;padding:12px;border:1px solid #384247;border-radius:10px;background:#0c1012;color:white;outline:none}input:focus{border-color:var(--green)}
+button{border:0;border-radius:10px;padding:11px 15px;background:var(--red);color:white;font-weight:700;cursor:pointer}button.secondary{background:#273136;border:1px solid #3c484d}button.green{background:#167c54}button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}.metric{padding:18px;border-radius:14px;background:#151a1d;border:1px solid var(--line)}.metric b{display:block;font-size:28px;margin-top:5px}.metric span{color:var(--muted);font-size:12px}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px}h2{font-size:16px;margin:0}.device-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.device{border:1px solid var(--line);background:#101416;border-radius:13px;padding:15px}.device h3{font-size:15px;margin:0 0 4px;overflow-wrap:anywhere}.pill{font-size:11px;border-radius:30px;padding:4px 8px;background:#283238;color:#c8d0d4}.pill.online{background:#113e2d;color:#67e7ad}.pill.offline{background:#412026;color:#ff9ba4}.device p{font-size:12px;color:var(--muted);margin:6px 0}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.actions button{font-size:12px;padding:8px 10px}.notice{padding:11px 13px;border-radius:10px;background:#201b13;border:1px solid #5b4522;color:#f4d7a0;font-size:12px;margin-bottom:14px}
+#message{min-height:20px;color:#ffc4c8;margin-top:10px;font-size:13px}.small{font-size:12px}.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed #3b454a;border-radius:12px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.device-list{grid-template-columns:1fr}.wrap{margin:18px auto}header{padding:12px 16px}}
+</style>
+</head>
+<body>
+<header><img class="logo" src="https://i.ibb.co/jZV93XTW/eed188294f3a.jpg" alt="LM26 logo"><div><h1>LM26 Phone Control</h1><p>ADMIN WEB DASHBOARD</p></div><div class="spacer"></div><button id="logout" class="secondary hidden">Sign out</button></header>
+<main class="wrap">
+<section id="loginPanel" class="panel login">
+<h2>Administrator login</h2><p class="muted small">Sign in with the Firebase Authentication account assigned to the configured Admin UID.</p>
+<label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="admin@example.com">
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" placeholder="Password">
+<div class="row" style="margin-top:16px"><button id="loginBtn">Sign in</button></div><div id="message" role="status"></div>
+</section>
+<section id="dashboard" class="hidden">
+<div class="notice">Only use this dashboard with devices you own or have explicit permission to manage. Commands are limited to visible, harmless actions (Ping / Show message).</div>
+<div class="row" style="justify-content:space-between"><div><h2>Device overview</h2><p class="muted small">Firebase Realtime Database · live updates</p></div><button class="secondary" id="refreshBtn">Refresh</button></div>
+<div class="grid"><div class="metric"><span>Registered devices</span><b id="total">0</b></div><div class="metric"><span>Online</span><b id="online">0</b></div><div class="metric"><span>Offline</span><b id="offline">0</b></div></div>
+<div class="panel"><div class="section-head"><h2>Connected devices</h2><span class="pill">Live</span></div><div id="devices" class="device-list"><div class="empty">Waiting for Firebase sign-in…</div></div></div>
+<p id="dashMessage" class="muted small"></p>
+</section>
+</main>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import { getDatabase, ref, onValue, push, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+const firebaseConfig = {"apiKey":"AIzaSyDU97Oe8oX1zbu1jnlEEbeKu6GXEuf7Lbc","authDomain":"lm26-admin-web.firebaseapp.com","databaseURL":"https://lm26-admin-web-default-rtdb.asia-southeast1.firebasedatabase.app","projectId":"lm26-admin-web","storageBucket":"lm26-admin-web.firebasestorage.app","messagingSenderId":"789261427537","appId":"1:789261427537:web:2279dfe9073a652e416970"};
+const ADMIN_UID = "B7RH4NNrrgdZpx6kRf6NvIlE8j12";
+const app = initializeApp(firebaseConfig), auth = getAuth(app), db = getDatabase(app);
+const $ = id => document.getElementById(id);
+let stopDevices = null, deviceData = {};
+function msg(s){$("message").textContent=s}
+function dashMsg(s){$("dashMessage").textContent=s}
+$("loginBtn").addEventListener("click", async ()=>{
+  msg("");
+  try { await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value); }
+  catch(e){ msg("Login failed: "+(e.code || e.message)); }
+});
+$("password").addEventListener("keydown",e=>{if(e.key==="Enter")$("loginBtn").click()});
+$("logout").addEventListener("click",()=>signOut(auth));
+$("refreshBtn").addEventListener("click",()=>renderDevices());
+onAuthStateChanged(auth,user=>{
+  if(stopDevices){stopDevices();stopDevices=null}
+  $("message").textContent="";
+  if(!user){$("loginPanel").classList.remove("hidden");$("dashboard").classList.add("hidden");$("logout").classList.add("hidden");return}
+  if(user.uid!==ADMIN_UID){signOut(auth);msg("This account is not the configured Admin UID.");return}
+  $("loginPanel").classList.add("hidden");$("dashboard").classList.remove("hidden");$("logout").classList.remove("hidden");
+  stopDevices=onValue(ref(db,"devices"),snap=>{deviceData=snap.val()||{};renderDevices()},err=>dashMsg("Database error: "+err.message));
+});
+function renderDevices(){
+ const list=$("devices"); list.replaceChildren();
+ const entries=Object.entries(deviceData);
+ const on=entries.filter(([id,d])=>d?.status?.online===true).length;
+ $("total").textContent=entries.length;$("online").textContent=on;$("offline").textContent=entries.length-on;
+ if(!entries.length){list.innerHTML='<div class="empty">No registered devices yet. Sign in on the Android app with a user account, then register the device in the database with this Admin account.</div>';return}
+ for(const [id,d] of entries){
+  const online=d?.status?.online===true, card=document.createElement("article");card.className="device";
+  const title=document.createElement("h3");title.textContent=d.name||id;
+  const pill=document.createElement("span");pill.className="pill "+(online?"online":"offline");pill.textContent=online?"ONLINE":"OFFLINE";
+  const row=document.createElement("div");row.className="row";row.append(title,pill);
+  const uid=document.createElement("p");uid.textContent="Device ID: "+id;
+  const owner=document.createElement("p");owner.textContent="Owner UID: "+(d.ownerUid||"not set");
+  const note=document.createElement("p");note.textContent="Status is reported by the app; it may be stale if the phone disconnects.";
+  const actions=document.createElement("div");actions.className="actions";
+  const ping=document.createElement("button");ping.className="green";ping.textContent="Send ping";ping.onclick=()=>sendCommand(id,"PING",{});
+  const show=document.createElement("button");show.className="secondary";show.textContent="Show message";show.onclick=()=>{const text=prompt("Message to display on the user's phone (visible notification):");if(text&&text.trim())sendCommand(id,"SHOW_MESSAGE",{text:text.trim().slice(0,180)})};
+  actions.append(ping,show);card.append(row,uid,owner,note,actions);list.append(card);
+ }
+}
+async function sendCommand(id,type,payload){
+ try {const cmdRef=push(ref(db,`devices/${id}/commands`));await set(cmdRef,{type,payload,createdAt:Date.now(),createdBy:auth.currentUser.uid,status:"pending"});dashMsg("Command queued for "+id+". The Android app must be online and consented.");}
+ catch(e){dashMsg("Could not send command: "+e.message)}
+}
+</script>
+</body></html>
